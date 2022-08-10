@@ -111,11 +111,28 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 
 	var libs []types.Library
 	var deps []types.Dependency
+	processed := map[string]artifact{}
 	uniqArtifacts := map[string]version{}
 
 	// Iterate direct and transitive dependencies
 	for !queue.IsEmpty() {
 		art := queue.dequeue()
+
+		{
+			id := id(art)
+			_, contains := processed[id]
+			keys := make([]string, 0, len(processed))
+			for k, _ := range processed {
+				keys = append(keys, k)
+			}
+			log.Logger.Info("processed: ", keys)
+			log.Logger.Info(id, "\t", contains)
+			if contains {
+				continue
+			} else {
+				processed[id] = art
+			}
+		}
 
 		// Modules should be handled separately so that they can have independent dependencies.
 		// It means multi-module allows for duplicate dependencies.
@@ -124,7 +141,21 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 			if err != nil {
 				return nil, nil, err
 			}
-			libs = append(libs, moduleLibs...)
+
+			for _, lib := range moduleLibs {
+				_, contains := processed[lib.ID]
+				if contains {
+					continue
+				} else {
+					groupID, artifactID, verion, err := deconstructID(lib.ID)
+					if err != nil {
+						log.Logger.Errorw("ID of %s could not be deconstructed", lib.ID)
+					} else {
+						processed[lib.ID] = newArtifact(groupID, artifactID, verion, nil)
+					}
+				}
+			}
+
 			if moduleDeps != nil {
 				deps = append(deps, moduleDeps...)
 			}
@@ -133,6 +164,7 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 
 		// For soft requirements, skip dependency resolution that has already been resolved.
 		if v, ok := uniqArtifacts[art.Name()]; ok {
+
 			if !v.shouldOverride(art.Version) {
 				continue
 			}
@@ -170,11 +202,17 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 	}
 
 	// Convert to []types.Library
-	for name, ver := range uniqArtifacts {
-		libs = append(libs, types.Library{
-			Name:    name,
-			Version: ver.String(),
-		})
+	for _, lib := range processed {
+		if !lib.IsEmpty() { // remove the (empty) root
+
+			libs = append(libs, types.Library{
+				ID:      id(lib),
+				Name:    lib.Name(),
+				Version: lib.Version.ver,
+			})
+		} else {
+			log.Logger.Info(id(lib), lib.Name, lib.Version.ver)
+		}
 	}
 
 	return libs, deps, nil
@@ -194,6 +232,17 @@ func buildArtifactDependency(result analysisResult) types.Dependency {
 
 func id(art artifact) string {
 	return fmt.Sprintf("%s.%s:%s", art.GroupID, art.ArtifactID, art.Version.String())
+}
+
+// expect groupID.artifactID.version
+func deconstructID(id string) (groupID string, artifactID string, version string, err error) {
+	arr := strings.Split(id, ":")
+	if len(arr) == 2 {
+		pos := strings.LastIndexByte(arr[0], '.')
+		substr := arr[0]
+		return substr[0:pos], substr[pos+1:], arr[1], nil
+	}
+	return "", "", "", xerrors.Errorf("multiple occurences of ':' in (%s)", id)
 }
 
 func (p *parser) parseModule(currentPath, relativePath string) (artifact, error) {
@@ -333,9 +382,6 @@ func (p parser) mergeDependencies(parent, child []artifact, exclusions map[strin
 	unique := map[string]struct{}{}
 
 	for _, d := range append(parent, child...) {
-		if _, ok := exclusions[d.Name()]; ok {
-			continue
-		}
 		if _, ok := unique[d.Name()]; ok {
 			continue
 		}
