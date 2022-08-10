@@ -125,8 +125,6 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 			for k, _ := range processed {
 				keys = append(keys, k)
 			}
-			log.Logger.Info("processed: ", keys)
-			log.Logger.Info(id, "\t", contains)
 			if contains {
 				continue
 			} else {
@@ -210,8 +208,6 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 				Name:    lib.Name(),
 				Version: lib.Version.ver,
 			})
-		} else {
-			log.Logger.Info(id(lib), lib.Name, lib.Version.ver)
 		}
 	}
 
