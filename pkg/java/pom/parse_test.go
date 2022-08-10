@@ -357,7 +357,6 @@ func TestPom_Parse(t *testing.T) {
 				},
 			},
 		},
-		// TODO: FAIL: additional version version 2.0.0 to version 1.7.30
 		{
 			name:      "soft requirement",
 			inputFile: filepath.Join("testdata", "soft-requirement", "pom.xml"),
