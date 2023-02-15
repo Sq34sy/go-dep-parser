@@ -299,16 +299,38 @@ func TestPom_Parse(t *testing.T) {
 			local:     true,
 			want: []types.Library{
 				{
+					ID:      "com.example.base:4.0.0",
 					Name:    "com.example:base",
 					Version: "4.0.0",
 				},
 				{
+					ID:      "org.example.example-api:1.7.30",
 					Name:    "org.example:example-api",
 					Version: "1.7.30",
 				},
 				{
+					ID:      "org.example.example-child:2.0.0",
 					Name:    "org.example:example-child",
 					Version: "2.0.0",
+				},
+				{
+					ID:      "org.example.utils:1.7.30",
+					Name:    "org.example:utils",
+					Version: "1.7.30",
+				},
+			},
+			wantDeps: []types.Dependency{
+				{
+					ID:        "com.example.base:4.0.0",
+					DependsOn: []string{"org.example.example-child:2.0.0"},
+				},
+				{
+					ID:        "org.example.example-child:2.0.0",
+					DependsOn: []string{"org.example.example-api:1.7.30"},
+				},
+				{
+					ID:        "org.example.example-api:1.7.30",
+					DependsOn: []string{"org.example.utils:1.7.30"},
 				},
 			},
 		},
@@ -733,20 +755,24 @@ func TestPom_Parse(t *testing.T) {
 			local:     true,
 			want: []types.Library{
 				{
+					ID:      "com.example.upper-pom-dep-management:1.0.0",
 					Name:    "com.example:upper-pom-dep-management",
 					Version: "1.0.0",
 				},
 				{
+					ID:      "org.example.example-api:2.0.0",
 					Name:    "org.example:example-api",
 					Version: "2.0.0",
 				},
 				// dependency version is taken from `com.example:upper-pom-dep-management` from dependencyManagement
 				// not from `com.example:example-nested` from `com.example:example-nested`
 				{
+					ID:      "org.example.example-dependency:1.2.4",
 					Name:    "org.example:example-dependency",
 					Version: "1.2.4",
 				},
 				{
+					ID:      "org.example.example-nested:3.3.3",
 					Name:    "org.example:example-nested",
 					Version: "3.3.3",
 				},
