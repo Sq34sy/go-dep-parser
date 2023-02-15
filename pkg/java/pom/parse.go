@@ -121,10 +121,6 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		{
 			id := id(art)
 			_, contains := processed[id]
-			keys := make([]string, 0, len(processed))
-			for k, _ := range processed {
-				keys = append(keys, k)
-			}
 			if contains {
 				continue
 			} else {
