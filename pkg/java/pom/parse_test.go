@@ -230,6 +230,45 @@ func TestPom_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:      "inherit properties in parent depManagement with import scope",
+			inputFile: filepath.Join("testdata", "inherit-props", "base", "pom.xml"),
+			local:     true,
+			want: []types.Library{
+				{
+					ID:      "com.example.test:0.0.1-SNAPSHOT",
+					Name:    "com.example:test",
+					Version: "0.0.1-SNAPSHOT",
+				},
+				{
+					ID:      "org.example.example-api:2.0.0",
+					Name:    "org.example:example-api",
+					Version: "2.0.0",
+				},
+			},
+		},
+		{
+			name:      "dependencyManagement prefers child properties",
+			inputFile: filepath.Join("testdata", "parent-child-properties", "child", "pom.xml"),
+			local:     true,
+			want: []types.Library{
+				{
+					ID:      "com.example.child:1.0.0",
+					Name:    "com.example:child",
+					Version: "1.0.0",
+				},
+				{
+					ID:      "org.example.example-api:4.0.0",
+					Name:    "org.example:example-api",
+					Version: "4.0.0",
+				},
+				{
+					ID:      "org.example.example-dependency:1.2.3",
+					Name:    "org.example:example-dependency",
+					Version: "1.2.3",
+				},
+			},
+		},
+		{
 			name:      "inherit parent dependencies",
 			inputFile: filepath.Join("testdata", "parent-dependencies", "child", "pom.xml"),
 			local:     false,
@@ -750,13 +789,13 @@ func TestPom_Parse(t *testing.T) {
 			},
 		},
 		{
-			name:      "overwrite artifact version from upper pom dependencyManagement",
-			inputFile: filepath.Join("testdata", "upper-pom-dep-management", "pom.xml"),
+			name:      "overwrite artifact version from dependencyManagement in the root POM",
+			inputFile: filepath.Join("testdata", "root-pom-dep-management", "pom.xml"),
 			local:     true,
 			want: []types.Library{
 				{
-					ID:      "com.example.upper-pom-dep-management:1.0.0",
-					Name:    "com.example:upper-pom-dep-management",
+					ID:      "com.example.root-pom-dep-management:1.0.0",
+					Name:    "com.example:root-pom-dep-management",
 					Version: "1.0.0",
 				},
 				{
@@ -764,7 +803,7 @@ func TestPom_Parse(t *testing.T) {
 					Name:    "org.example:example-api",
 					Version: "2.0.0",
 				},
-				// dependency version is taken from `com.example:upper-pom-dep-management` from dependencyManagement
+				// dependency version is taken from `com.example:root-pom-dep-management` from dependencyManagement
 				// not from `com.example:example-nested` from `com.example:example-nested`
 				{
 					ID:      "org.example.example-dependency:1.2.4",
@@ -775,6 +814,35 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "org.example.example-nested:3.3.3",
 					Name:    "org.example:example-nested",
 					Version: "3.3.3",
+				},
+			},
+		},
+		{
+			name:      "transitive dependencyManagement should not be inherited",
+			inputFile: "testdata/transitive-dependency-management/pom.xml",
+			local:     true,
+			want: []types.Library{
+				// Managed dependencies (org.example:example-api:1.7.30) in org.example:example-dependency-management3
+				// should not affect dependencies of example-dependency (org.example:example-api:2.0.0)
+				{
+					ID:      "org.example.example-api:2.0.0",
+					Name:    "org.example:example-api",
+					Version: "2.0.0",
+				},
+				{
+					ID:      "org.example.example-dependency-management3:1.1.1",
+					Name:    "org.example:example-dependency-management3",
+					Version: "1.1.1",
+				},
+				{
+					ID:      "org.example.example-dependency:1.2.3",
+					Name:    "org.example:example-dependency",
+					Version: "1.2.3",
+				},
+				{
+					ID:      "org.example.transitive-dependency-management:2.0.0",
+					Name:    "org.example:transitive-dependency-management",
+					Version: "2.0.0",
 				},
 			},
 		},
