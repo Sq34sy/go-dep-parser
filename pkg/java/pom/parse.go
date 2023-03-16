@@ -141,12 +141,15 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 				if contains {
 					continue
 				} else {
-					groupID, artifactID, verion, err := deconstructID(lib.ID)
-					if err != nil {
-						log.Logger.Errorw("ID of %s could not be deconstructed", lib.ID)
+					parts := strings.Split(lib.Name, ":")
+
+					if len(parts) != 2 {
+						log.Logger.Errorw("Invalid library name: %s", lib.Name)
 					} else {
+						groupID, artifactID, verion := parts[0], parts[1], lib.Version
 						processed[lib.ID] = newArtifact(groupID, artifactID, verion, nil)
 					}
+
 				}
 			}
 
@@ -224,17 +227,6 @@ func buildArtifactDependency(result analysisResult) types.Dependency {
 
 func id(art artifact) string {
 	return fmt.Sprintf("%s.%s:%s", art.GroupID, art.ArtifactID, art.Version.String())
-}
-
-// expect groupID.artifactID.version
-func deconstructID(id string) (groupID string, artifactID string, version string, err error) {
-	arr := strings.Split(id, ":")
-	if len(arr) == 2 {
-		pos := strings.LastIndexByte(arr[0], '.')
-		substr := arr[0]
-		return substr[0:pos], substr[pos+1:], arr[1], nil
-	}
-	return "", "", "", xerrors.Errorf("multiple occurences of ':' in (%s)", id)
 }
 
 func (p *parser) parseModule(currentPath, relativePath string) (artifact, error) {
