@@ -122,14 +122,11 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 	for !queue.IsEmpty() {
 		art := queue.dequeue()
 
-		{
-			id := id(art)
-			_, contains := processed[id]
-			if contains {
-				continue
-			} else {
-				processed[id] = art
-			}
+		id := id(art)
+		if _, contains := processed[id]; contains {
+			continue
+		} else {
+			processed[id] = art
 		}
 
 		// Modules should be handled separately so that they can have independent dependencies.
@@ -141,8 +138,7 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 			}
 
 			for _, lib := range moduleLibs {
-				_, contains := processed[lib.ID]
-				if contains {
+				if _, contains := processed[lib.ID]; contains {
 					continue
 				} else {
 					parts := strings.Split(lib.Name, ":")
