@@ -870,6 +870,47 @@ func TestPom_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:      "double dependency",
+			inputFile: filepath.Join("testdata", "double-dependency", "pom.xml"),
+			local:     true,
+			want: []types.Library{
+				{
+					ID:      "com.example.dd:3.0.0",
+					Name:    "com.example:dd",
+					Version: "3.0.0",
+				},
+				{
+					ID:      "org.example.example-api:2.0.0",
+					Name:    "org.example:example-api",
+					Version: "2.0.0",
+				},
+				{
+					ID:      "org.example.example-dependency:1.2.3",
+					Name:    "org.example:example-dependency",
+					Version: "1.2.3",
+				},
+				{
+					ID:      "org.example.example-nested:3.3.3",
+					Name:    "org.example:example-nested",
+					Version: "3.3.3",
+				},
+			},
+			wantDeps: []types.Dependency{
+				{
+					ID:        "com.example.dd:3.0.0",
+					DependsOn: []string{"org.example.example-nested:3.3.3", "org.example.example-dependency:1.2.3"},
+				},
+				{
+					ID:        "org.example.example-nested:3.3.3",
+					DependsOn: []string{"org.example.example-dependency:1.2.3"},
+				},
+				{
+					ID:        "org.example.example-dependency:1.2.3",
+					DependsOn: []string{"org.example.example-api:2.0.0"},
+				},
+			},
+		},
+		{
 			name:      "dependency not found",
 			inputFile: filepath.Join("testdata", "not-found-dependency", "pom.xml"),
 			local:     true,
