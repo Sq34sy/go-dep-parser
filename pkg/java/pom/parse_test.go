@@ -670,11 +670,6 @@ func TestPom_Parse(t *testing.T) {
 					Version: "3.0.0",
 				},
 				{
-					ID:      "org.example.example-api:2.0.0",
-					Name:    "org.example:example-api",
-					Version: "2.0.0",
-				},
-				{
 					ID:      "org.example.example-dependency:1.2.3",
 					Name:    "org.example:example-dependency",
 					Version: "1.2.3",
@@ -693,10 +688,6 @@ func TestPom_Parse(t *testing.T) {
 				{
 					ID:        "org.example.example-nested:3.3.3",
 					DependsOn: []string{"org.example.example-dependency:1.2.3"},
-				},
-				{
-					ID:        "org.example.example-dependency:1.2.3",
-					DependsOn: []string{"org.example.example-api:2.0.0"},
 				},
 			},
 		},

@@ -405,6 +405,10 @@ func (p *parser) mergeDependencies(parent, child []artifact, exclusions map[stri
 	unique := map[string]struct{}{}
 
 	for _, d := range append(parent, child...) {
+		if _, ok := exclusions[d.Name()]; ok {
+			continue
+		}
+
 		if _, ok := unique[d.Name()]; ok {
 			continue
 		}
