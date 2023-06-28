@@ -25,7 +25,12 @@ func (p *pom) inherit(result analysisResult) {
 
 	p.content.GroupId = art.GroupID
 	p.content.ArtifactId = art.ArtifactID
-	p.content.Version = art.Version.String()
+
+	if isProperty(art.Version.String()) {
+		p.content.Version = evaluateVariable(art.Version.String(), p.content.Properties, nil)
+	} else {
+		p.content.Version = art.Version.String()
+	}
 }
 
 func (p pom) properties() properties {
@@ -37,9 +42,18 @@ func (p pom) projectProperties() map[string]string {
 	val := reflect.ValueOf(p.content).Elem()
 	props := p.listProperties(val)
 
+	// "version" and "groupId" elements could be inherited from parent.
+	// https://maven.apache.org/pom.html#inheritance
+	props["groupId"] = p.content.GroupId
+	props["version"] = p.content.Version
+
 	// https://maven.apache.org/pom.html#properties
 	projectProperties := map[string]string{}
 	for k, v := range props {
+		if strings.HasPrefix(k, "project.") {
+			continue
+		}
+
 		// e.g. ${project.groupId}
 		key := fmt.Sprintf("project.%s", k)
 		projectProperties[key] = v
@@ -86,7 +100,17 @@ func (p pom) listProperties(val reflect.Value) map[string]string {
 }
 
 func (p pom) artifact() artifact {
-	return newArtifact(p.content.GroupId, p.content.ArtifactId, p.content.Version, p.content.Properties)
+	return newArtifact(p.content.GroupId, p.content.ArtifactId, p.content.Version, p.joinLicenses(), p.content.Properties)
+}
+
+func (p pom) joinLicenses() string {
+	var licenses []string
+	for _, license := range p.content.Licenses.License {
+		if license.Name != "" {
+			licenses = append(licenses, license.Name)
+		}
+	}
+	return strings.Join(licenses, ", ")
 }
 
 func (p pom) repositories() []string {
@@ -104,7 +128,12 @@ type pomXML struct {
 	GroupId    string    `xml:"groupId"`
 	ArtifactId string    `xml:"artifactId"`
 	Version    string    `xml:"version"`
-	Modules    struct {
+	Licenses   struct {
+		License []struct {
+			Name string `xml:"name"`
+		} `xml:"license"`
+	} `xml:"licenses"`
+	Modules struct {
 		Text   string   `xml:",chardata"`
 		Module []string `xml:"module"`
 	} `xml:"modules"`

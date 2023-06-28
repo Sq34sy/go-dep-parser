@@ -114,8 +114,7 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		libs              []types.Library
 		deps              []types.Dependency
 		rootDepManagement []pomDependency
-		processed         = map[string]artifact{}
-		uniqArtifacts     = map[string]version{}
+		uniqArtifacts     = map[string]artifact{}
 	)
 
 	// Iterate direct and transitive dependencies
@@ -160,9 +159,8 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		}
 
 		// For soft requirements, skip dependency resolution that has already been resolved.
-		if v, ok := uniqArtifacts[art.Name()]; ok {
-
-			if !v.shouldOverride(art.Version) {
+		if uniqueArt, ok := uniqArtifacts[art.Name()]; ok {
+			if !uniqueArt.Version.shouldOverride(art.Version) {
 				continue
 			}
 		}
@@ -181,7 +179,8 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		for _, relativePath := range result.modules {
 			moduleArtifact, err := p.parseModule(result.filePath, relativePath)
 			if err != nil {
-				return nil, nil, xerrors.Errorf("module error (%s): %w", relativePath, err)
+				log.Logger.Debugf("Unable to parse %q module: %s", result.filePath, err)
+				continue
 			}
 
 			queue.enqueue(moduleArtifact)
@@ -199,20 +198,20 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		// Offline mode may be missing some fields.
 		if !art.IsEmpty() {
 			// Override the version
-			uniqArtifacts[art.Name()] = art.Version
+			uniqArtifacts[art.Name()] = artifact{
+				Version: art.Version,
+				License: art.License,
+			}
 		}
 	}
 
 	// Convert to []types.Library
-	for _, lib := range processed {
-		if !lib.IsEmpty() { // remove the (empty) root
-
-			libs = append(libs, types.Library{
-				ID:      id(lib),
-				Name:    lib.Name(),
-				Version: lib.Version.ver,
-			})
-		}
+	for name, art := range uniqArtifacts {
+		libs = append(libs, types.Library{
+			Name:    name,
+			Version: art.Version.String(),
+			License: art.License,
+		})
 	}
 
 	return libs, deps, nil
@@ -386,7 +385,7 @@ func (p *parser) resolveDepManagement(props map[string]string, depManagement []p
 	// Managed dependencies with a scope of "import" should be processed after other managed dependencies.
 	// cf. https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
 	for _, imp := range imports {
-		art := newArtifact(imp.GroupID, imp.ArtifactID, imp.Version, props)
+		art := newArtifact(imp.GroupID, imp.ArtifactID, imp.Version, "", props)
 		result, err := p.resolve(art, nil)
 		if err != nil {
 			continue
@@ -405,7 +404,7 @@ func (p *parser) mergeDependencies(parent, child []artifact, exclusions map[stri
 	unique := map[string]struct{}{}
 
 	for _, d := range append(parent, child...) {
-		if _, ok := exclusions[d.Name()]; ok {
+		if excludeDep(exclusions, d) {
 			continue
 		}
 
@@ -419,10 +418,27 @@ func (p *parser) mergeDependencies(parent, child []artifact, exclusions map[stri
 	return deps
 }
 
+func excludeDep(exclusions map[string]struct{}, art artifact) bool {
+	if _, ok := exclusions[art.Name()]; ok {
+		return true
+	}
+	// Maven can use "*" in GroupID and ArtifactID fields to exclude dependencies
+	// https://maven.apache.org/pom.html#exclusions
+	for exlusion := range exclusions {
+		// exclusion format - "<groupID>:<artifactID>"
+		e := strings.Split(exlusion, ":")
+		if (e[0] == art.GroupID || e[0] == "*") && (e[1] == art.ArtifactID || e[1] == "*") {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *parser) parseParent(currentPath string, parent pomParent) (analysisResult, error) {
 	// Pass nil properties so that variables in <parent> are not evaluated.
-	target := newArtifact(parent.GroupId, parent.ArtifactId, parent.Version, nil)
-	if target.IsEmpty() {
+	target := newArtifact(parent.GroupId, parent.ArtifactId, parent.Version, "", nil)
+	// if version is property (e.g. ${revision}) - we still need to parse this pom
+	if target.IsEmpty() && !isProperty(parent.Version) {
 		return analysisResult{}, nil
 	}
 	log.Logger.Debugf("Start parent: %s", target.String())

@@ -34,6 +34,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.happy:1.0.0",
 					Name:    "com.example:happy",
 					Version: "1.0.0",
+					License: "BSD-3-Clause",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -150,6 +151,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.happy:1.0.0",
 					Name:    "com.example:happy",
 					Version: "1.0.0",
+					License: "BSD-3-Clause",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -206,6 +208,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.child:1.0.0",
 					Name:    "com.example:child",
 					Version: "1.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -226,6 +229,21 @@ func TestPom_Parse(t *testing.T) {
 				{
 					ID:        "org.example.example-api:1.7.30",
 					DependsOn: []string{"org.example.utils:1.7.30"},
+				},
+			},
+		},
+		{
+			name:      "inherit project properties from parent",
+			inputFile: filepath.Join("testdata", "project-version-from-parent", "child", "pom.xml"),
+			local:     true,
+			want: []types.Library{
+				{
+					Name:    "com.example:child",
+					Version: "2.0.0",
+				},
+				{
+					Name:    "org.example:example-api",
+					Version: "2.0.0",
 				},
 			},
 		},
@@ -277,6 +295,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.child:1.0.0-SNAPSHOT",
 					Name:    "com.example:child",
 					Version: "1.0.0-SNAPSHOT",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -309,6 +328,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.child:3.0.0",
 					Name:    "com.example:child",
 					Version: "3.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -341,6 +361,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.base:4.0.0",
 					Name:    "com.example:base",
 					Version: "4.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -382,6 +403,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.child:1.0.0",
 					Name:    "com.example:child",
 					Version: "1.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -406,6 +428,21 @@ func TestPom_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:      "parent version in property",
+			inputFile: filepath.Join("testdata", "parent-version-is-property", "child", "pom.xml"),
+			local:     false,
+			want: []types.Library{
+				{
+					Name:    "com.example:child",
+					Version: "1.0.0-SNAPSHOT",
+				},
+				{
+					Name:    "org.example:example-api",
+					Version: "1.1.1",
+				},
+			},
+		},
+		{
 			name:      "parent in a remote repository",
 			inputFile: filepath.Join("testdata", "parent-remote-repository", "pom.xml"),
 			local:     true,
@@ -414,6 +451,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "org.example.child:1.0.0",
 					Name:    "org.example:child",
 					Version: "1.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -446,6 +484,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.soft:1.0.0",
 					Name:    "com.example:soft",
 					Version: "1.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -540,6 +579,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.hard:1.0.0",
 					Name:    "com.example:hard",
 					Version: "1.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -586,6 +626,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.hard:1.0.0",
 					Name:    "com.example:hard",
 					Version: "1.0.0",
+					License: "Apache 2.0",
 				},
 			},
 			wantDeps: []types.Dependency{
@@ -604,6 +645,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.import:2.0.0",
 					Name:    "com.example:import",
 					Version: "2.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -636,6 +678,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.import:2.0.0",
 					Name:    "com.example:import",
 					Version: "2.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -692,6 +735,29 @@ func TestPom_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:      "exclusions with wildcards",
+			inputFile: filepath.Join("testdata", "wildcard-exclusions", "pom.xml"),
+			local:     true,
+			want: []types.Library{
+				{
+					Name:    "com.example:wildcard-exclusions",
+					Version: "4.0.0",
+				},
+				{
+					Name:    "org.example:example-dependency",
+					Version: "1.2.3",
+				},
+				{
+					Name:    "org.example:example-dependency2",
+					Version: "2.3.4",
+				},
+				{
+					Name:    "org.example:example-nested",
+					Version: "3.3.3",
+				},
+			},
+		},
+		{
 			name:      "multi module",
 			inputFile: filepath.Join("testdata", "multi-module", "pom.xml"),
 			local:     true,
@@ -700,11 +766,13 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.aggregation:1.0.0",
 					Name:    "com.example:aggregation",
 					Version: "1.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "com.example.module:1.1.1",
 					Name:    "com.example:module",
 					Version: "1.1.1",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -846,6 +914,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.no-parent:1.0-SNAPSHOT",
 					Name:    "com.example:no-parent",
 					Version: "1.0-SNAPSHOT",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-api:1.7.30",
@@ -919,6 +988,7 @@ func TestPom_Parse(t *testing.T) {
 					ID:      "com.example.not-found-dependency:1.0.0",
 					Name:    "com.example:not-found-dependency",
 					Version: "1.0.0",
+					License: "Apache 2.0",
 				},
 				{
 					ID:      "org.example.example-not-found:999",
@@ -934,10 +1004,28 @@ func TestPom_Parse(t *testing.T) {
 			},
 		},
 		{
-			name:      "module not found",
+			name:      "module not found - unable to parse module",
 			inputFile: filepath.Join("testdata", "not-found-module", "pom.xml"),
 			local:     true,
-			wantErr:   "stat testdata/not-found-module/module: no such file or directory",
+			want: []types.Library{
+				{
+					Name:    "com.example:aggregation",
+					Version: "1.0.0",
+					License: "Apache 2.0",
+				},
+			},
+		},
+		{
+			name:      "multiply licenses",
+			inputFile: filepath.Join("testdata", "multiply-licenses", "pom.xml"),
+			local:     true,
+			want: []types.Library{
+				{
+					Name:    "com.example:multiply-licenses",
+					Version: "1.0.0",
+					License: "MIT, Apache 2.0",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
