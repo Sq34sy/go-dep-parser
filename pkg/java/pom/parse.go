@@ -121,13 +121,6 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 	for !queue.IsEmpty() {
 		art := queue.dequeue()
 
-		id := id(art)
-		if _, contains := processed[id]; contains {
-			continue
-		} else {
-			processed[id] = art
-		}
-
 		// Modules should be handled separately so that they can have independent dependencies.
 		// It means multi-module allows for duplicate dependencies.
 		if art.Module {
@@ -137,18 +130,17 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 			}
 
 			for _, lib := range moduleLibs {
-				if _, contains := processed[lib.ID]; contains {
-					continue
+				parts := strings.Split(lib.Name, ":")
+
+				if len(parts) != 2 {
+					log.Logger.Errorw("Invalid library name: %s", lib.Name)
 				} else {
-					parts := strings.Split(lib.Name, ":")
-
-					if len(parts) != 2 {
-						log.Logger.Errorw("Invalid library name: %s", lib.Name)
-					} else {
-						groupID, artifactID, verion := parts[0], parts[1], lib.Version
-						processed[lib.ID] = newArtifact(groupID, artifactID, verion, nil)
+					groupID, artifactID := parts[0], parts[1]
+					newArt := newArtifact(groupID, artifactID, lib.Version, lib.License, nil)
+					if _, contains := uniqArtifacts[newArt.String()]; contains {
+						continue
 					}
-
+					uniqArtifacts[newArt.String()] = newArt
 				}
 			}
 
@@ -159,10 +151,12 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		}
 
 		// For soft requirements, skip dependency resolution that has already been resolved.
-		if uniqueArt, ok := uniqArtifacts[art.Name()]; ok {
+		if uniqueArt, ok := uniqArtifacts[art.String()]; ok {
 			if !uniqueArt.Version.shouldOverride(art.Version) {
 				continue
 			}
+		} else {
+			uniqArtifacts[art.String()] = art
 		}
 
 		result, err := p.resolve(art, rootDepManagement)
@@ -189,7 +183,10 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		// Resolve transitive dependencies later
 		queue.enqueue(result.dependencies...)
 
-		dependency := buildArtifactDependency(result)
+		dependency := types.Dependency{
+			ID:        art.String(),
+			DependsOn: buildDependency(result),
+		}
 
 		if len(dependency.DependsOn) > 0 {
 			deps = append(deps, dependency)
@@ -198,17 +195,19 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		// Offline mode may be missing some fields.
 		if !art.IsEmpty() {
 			// Override the version
-			uniqArtifacts[art.Name()] = artifact{
-				Version: art.Version,
-				License: art.License,
+			uniqArtifacts[art.String()] = artifact{
+				GroupID:    art.GroupID,
+				ArtifactID: art.ArtifactID,
+				Version:    art.Version,
+				License:    art.License,
 			}
 		}
 	}
 
 	// Convert to []types.Library
-	for name, art := range uniqArtifacts {
+	for _, art := range uniqArtifacts {
 		libs = append(libs, types.Library{
-			Name:    name,
+			Name:    art.Name(),
 			Version: art.Version.String(),
 			License: art.License,
 		})
@@ -217,20 +216,13 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 	return libs, deps, nil
 }
 
-func buildArtifactDependency(result analysisResult) types.Dependency {
-	dependency := types.Dependency{
-		ID: id(result.artifact),
-	}
-
+func buildDependency(result analysisResult) []string {
+	var dependsOn = []string{}
 	for _, d := range result.dependencies {
-		dependency.DependsOn = append(dependency.DependsOn, id(d))
+		dependsOn = append(dependsOn, d.String())
 	}
 
-	return dependency
-}
-
-func id(art artifact) string {
-	return fmt.Sprintf("%s.%s:%s", art.GroupID, art.ArtifactID, art.Version.String())
+	return dependsOn
 }
 
 func (p *parser) parseModule(currentPath, relativePath string) (artifact, error) {
