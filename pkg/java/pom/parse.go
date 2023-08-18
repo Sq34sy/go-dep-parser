@@ -128,18 +128,35 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 			if err != nil {
 				return nil, nil, err
 			}
-			libs = append(libs, moduleLibs...)
-			if deps != nil {
+
+			for _, lib := range moduleLibs {
+				parts := strings.Split(lib.Name, ":")
+
+				if len(parts) != 2 {
+					log.Logger.Errorw("Invalid library name: %s", lib.Name)
+				} else {
+					groupID, artifactID := parts[0], parts[1]
+					newArt := newArtifact(groupID, artifactID, lib.Version, strings.Split(lib.License, ", "), nil)
+					if _, contains := uniqArtifacts[newArt.String()]; contains {
+						continue
+					}
+					uniqArtifacts[newArt.String()] = newArt
+				}
+			}
+
+			if moduleDeps != nil {
 				deps = append(deps, moduleDeps...)
 			}
 			continue
 		}
 
 		// For soft requirements, skip dependency resolution that has already been resolved.
-		if uniqueArt, ok := uniqArtifacts[art.Name()]; ok {
+		if uniqueArt, ok := uniqArtifacts[art.String()]; ok {
 			if !uniqueArt.Version.shouldOverride(art.Version) {
 				continue
 			}
+		} else {
+			uniqArtifacts[art.String()] = art
 		}
 
 		result, err := p.resolve(art, rootDepManagement)
@@ -166,26 +183,46 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		// Resolve transitive dependencies later
 		queue.enqueue(result.dependencies...)
 
+		dependency := types.Dependency{
+			ID:        art.String(),
+			DependsOn: buildDependency(result),
+		}
+
+		if len(dependency.DependsOn) > 0 {
+			deps = append(deps, dependency)
+		}
+
 		// Offline mode may be missing some fields.
 		if !art.IsEmpty() {
 			// Override the version
-			uniqArtifacts[art.Name()] = artifact{
-				Version:  art.Version,
-				Licenses: art.Licenses,
+			uniqArtifacts[art.String()] = artifact{
+				GroupID:    art.GroupID,
+				ArtifactID: art.ArtifactID,
+				Version:    art.Version,
+				Licenses:   art.Licenses,
 			}
 		}
 	}
 
 	// Convert to []types.Library
-	for name, art := range uniqArtifacts {
+	for _, art := range uniqArtifacts {
 		libs = append(libs, types.Library{
-			Name:    name,
+			Name:    art.Name(),
 			Version: art.Version.String(),
 			License: art.JoinLicenses(),
 		})
 	}
 
 	return libs, deps, nil
+}
+
+func buildDependency(result analysisResult) []string {
+	var dependsOn = []string{}
+	for _, d := range result.dependencies {
+		dependsOn = append(dependsOn, d.String())
+	}
+
+	return dependsOn
 }
 
 func (p *parser) parseModule(currentPath, relativePath string) (artifact, error) {
@@ -340,7 +377,7 @@ func (p *parser) resolveDepManagement(props map[string]string, depManagement []p
 	// Managed dependencies with a scope of "import" should be processed after other managed dependencies.
 	// cf. https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
 	for _, imp := range imports {
-		art := newArtifact(imp.GroupID, imp.ArtifactID, imp.Version, nil, props)
+		art := newArtifact(imp.GroupID, imp.ArtifactID, imp.Version, make([]string, 0), props)
 		result, err := p.resolve(art, nil)
 		if err != nil {
 			continue
@@ -362,6 +399,7 @@ func (p *parser) mergeDependencies(parent, child []artifact, exclusions map[stri
 		if excludeDep(exclusions, d) {
 			continue
 		}
+
 		if _, ok := unique[d.Name()]; ok {
 			continue
 		}
@@ -390,7 +428,7 @@ func excludeDep(exclusions map[string]struct{}, art artifact) bool {
 
 func (p *parser) parseParent(currentPath string, parent pomParent) (analysisResult, error) {
 	// Pass nil properties so that variables in <parent> are not evaluated.
-	target := newArtifact(parent.GroupId, parent.ArtifactId, parent.Version, nil, nil)
+	target := newArtifact(parent.GroupId, parent.ArtifactId, parent.Version, make([]string, 0), nil)
 	// if version is property (e.g. ${revision}) - we still need to parse this pom
 	if target.IsEmpty() && !isProperty(parent.Version) {
 		return analysisResult{}, nil
